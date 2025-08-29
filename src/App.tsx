@@ -29,6 +29,13 @@ function App() {
         type: "html",
         content: { html: item.showMsg },
         position: item.isKefu ? "left" : "right",
+        createdAt: Date.parse(item.creationTime),
+        hasTime:
+          messages.length > 1 &&
+          shouldShowTime(
+            messages[messages.length - 1].createdAt || 0,
+            Date.parse(item.creationTime)
+          ),
       });
     }
     if (item.msgModel && item.msgModel.imageModels) {
@@ -37,24 +44,30 @@ function App() {
           type: "image",
           content: { src: imgItem.url },
           position: item.isKefu ? "left" : "right",
+          createdAt: Date.parse(item.creationTime),
+          hasTime:
+            messages.length > 1 &&
+            shouldShowTime(
+              messages[messages.length - 1].createdAt || 0,
+              Date.parse(item.creationTime)
+            ),
         });
       });
     }
   }, []);
-
+  function shouldShowTime(prevTime: number, currentTime: number) {
+    return currentTime - prevTime > 10 * 60 * 1000; // 超过10分钟才显示时间
+  }
   // 处理收到的消息
-  const handleMessage = useCallback(
-    (message: ChatMessage) => {
-      console.log(`收到消息:`, message);
-      // 添加收到的消息到聊天界面
-      addMessage(message);
-      // 发送消息已读
-      sendMessage("MsgRead", user.chatid);
+  const handleMessage = useCallback((message: ChatMessage) => {
+    console.log(`收到消息:`, message);
+    // 添加收到的消息到聊天界面
+    addMessage(message);
+    // 发送消息已读
+    sendMessage("MsgRead", user.chatid);
 
-      // CloseGroup
-    },
-    []
-  );
+    // CloseGroup
+  }, []);
 
   const { sendMessage } = useSignalR({
     chatId: user.chatid,
