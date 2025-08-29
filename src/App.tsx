@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import type { UserModel } from "./types/userModel";
+import { Config } from "./utils/config";
 import type { ChatMessage } from "./types/chatMessage";
 import { API } from "./utils/api";
 import { useSignalR } from "./utils/signalRService";
@@ -24,11 +25,15 @@ function App() {
   });
 
   const addMessage = useCallback((item: ChatMessage) => {
+    console.log(`添加消息:`, Config.kefuAvatar);
     if (item.msg !== "") {
       appendMsg({
         type: "html",
         content: { html: item.showMsg },
         position: item.isKefu ? "left" : "right",
+        user: {
+          avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
+        },
         createdAt: Date.parse(item.creationTime),
         hasTime:
           messages.length > 1 &&
@@ -45,6 +50,9 @@ function App() {
           content: { src: imgItem.url },
           position: item.isKefu ? "left" : "right",
           createdAt: Date.parse(item.creationTime),
+          user: {
+            avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
+          },
           hasTime:
             messages.length > 1 &&
             shouldShowTime(
