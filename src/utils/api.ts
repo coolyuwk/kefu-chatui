@@ -1,4 +1,5 @@
 import { Config } from "./config";
+import type { ChatHistoryResponse } from "../types/chatMessage";
 
 // 通用API请求类
 class ApiClient {
@@ -24,10 +25,11 @@ export const apiClient = new ApiClient();
 export const API = {
   chat: {
     // 获取对话历史
-    getHistory: (chatId: string, startTime: string) => {
-      return apiClient.get(
+    getHistory: async (chatId: string, startTime: string): Promise<ChatHistoryResponse> => {
+      const response = await apiClient.get(
         `/kefu/getMsgList?groupId=${chatId}&startTime=${startTime}`
       );
+      return JSON.parse(response);
     },
     // 获取当前群组ID
     getChatid: (uid: string) => {
