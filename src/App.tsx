@@ -40,7 +40,7 @@ function App() {
         });
       });
     }
-  }, []);
+  }, [appendMsg]);
 
   // 处理收到的消息
   const handleMessage = useCallback(
@@ -53,7 +53,7 @@ function App() {
 
       // CloseGroup
     },
-    [user.chatid]
+    [user.chatid, addMessage]
   );
 
   const { sendMessage } = useSignalR({
