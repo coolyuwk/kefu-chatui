@@ -26,39 +26,37 @@ function App() {
 
   const addMessage = useCallback((item: ChatMessage) => {
     console.log(`添加消息:`, Config.kefuAvatar);
+
+    // 创建基础消息对象，包含所有消息的公共属性
+    const createBaseMessage = () => ({
+      position: item.isKefu ? "left" as const : "right" as const,
+      user: {
+        avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
+        name: item.userName,
+      },
+      createdAt: Date.parse(item.creationTime),
+      hasTime:
+        messages.length > 1 &&
+        shouldShowTime(
+          messages[messages.length - 1].createdAt || 0,
+          Date.parse(item.creationTime)
+        ),
+    });
+
     if (item.msg !== "") {
       appendMsg({
+        ...createBaseMessage(),
         type: "html",
         content: { html: item.showMsg },
-        position: item.isKefu ? "left" : "right",
-        user: {
-          avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
-        },
-        createdAt: Date.parse(item.creationTime),
-        hasTime:
-          messages.length > 1 &&
-          shouldShowTime(
-            messages[messages.length - 1].createdAt || 0,
-            Date.parse(item.creationTime)
-          ),
       });
     }
+    
     if (item.msgModel && item.msgModel.imageModels) {
       item.msgModel.imageModels.forEach((imgItem) => {
         appendMsg({
+          ...createBaseMessage(),
           type: "image",
           content: { src: imgItem.url },
-          position: item.isKefu ? "left" : "right",
-          createdAt: Date.parse(item.creationTime),
-          user: {
-            avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
-          },
-          hasTime:
-            messages.length > 1 &&
-            shouldShowTime(
-              messages[messages.length - 1].createdAt || 0,
-              Date.parse(item.creationTime)
-            ),
         });
       });
     }
