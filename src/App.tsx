@@ -11,6 +11,7 @@ import Chat, {
   RichText,
   MessageProps,
   useMessages,
+  toast,
 } from "@chatui/core";
 // 引入样式
 import "@chatui/core/dist/index.css";
@@ -29,7 +30,7 @@ function App() {
 
     // 创建基础消息对象，包含所有消息的公共属性
     const createBaseMessage = () => ({
-      position: item.isKefu ? "left" as const : "right" as const,
+      position: item.isKefu ? ("left" as const) : ("right" as const),
       user: {
         avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
         name: item.userName,
@@ -50,7 +51,7 @@ function App() {
         content: { html: item.showMsg },
       });
     }
-    
+
     if (item.msgModel && item.msgModel.imageModels) {
       item.msgModel.imageModels.forEach((imgItem) => {
         appendMsg({
@@ -87,7 +88,10 @@ function App() {
     const uid = params.get("uid") || "";
     // 获取系统语言并设置 area
     const area = navigator.language || navigator.languages[0] || "";
-
+    if (!uid) {
+      console.error("缺少 uid 参数，无法初始化用户信息");
+      return;
+    }
     setUser((prevUser) => ({
       ...prevUser,
       username,
@@ -153,6 +157,7 @@ function App() {
 
   return (
     <Chat
+      locale={user.area}
       navbar={{ title: "智能助理" }}
       messages={messages}
       renderMessageContent={renderMessageContent}
