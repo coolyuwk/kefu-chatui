@@ -157,11 +157,17 @@ function App() {
 
   return (
     <Chat
+      isX
+      
       locale={user.area}
       navbar={{ title: "智能助理" }}
       messages={messages}
+      wideBreakpoint="800px"
+
       renderMessageContent={renderMessageContent}
       onSend={handleSend}
+      toolbar={[{ type: 'image', icon: 'image', title: '图片' }]}
+      onImageSend={() => Promise.resolve()}
     />
   );
 }
