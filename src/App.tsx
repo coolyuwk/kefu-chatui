@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useId } from "react";
 import type { UserModel } from "./types/userModel";
 import { Config } from "./utils/config";
 import type { ChatMessage } from "./types/chatMessage";
@@ -25,13 +25,12 @@ function App() {
   console.log(`theme:`, themeJson);
   const theme = JSON.parse(decodeURIComponent(themeJson));
   const { messages, appendMsg } = useMessages([]);
-  const [user, setUser] = useState<UserModel>({
-    username: "",
-    uid: "",
-    area: "",
-    chatid: "",
-  });
-
+  const [chatId, setChatId] = useState("");
+  const params = new URLSearchParams(window.location.search);
+  const username = params.get("username") || "";
+  const uid = params.get("uid") || "";
+  // 获取系统语言并设置 area
+  const area = navigator.language || navigator.languages[0] || "";
   const [groupIsClose, setGroupIsClose] = useState(false);
 
   // 点击预设问题时，发送消息给服务器
@@ -39,8 +38,8 @@ function App() {
     if (groupIsClose) {
       return;
     }
-    console.log(`点击预设问题时，发送消息给服务器:`, questionId, user.chatid);
-    sendMessage("QuestionAsync", questionId, user.chatid);
+    console.log(`点击预设问题时，发送消息给服务器:`, questionId, chatId);
+    sendMessage("QuestionAsync", questionId, chatId);
   }
 
   // 收到消息时，添加到聊天界面
@@ -105,35 +104,24 @@ function App() {
     // 添加收到的消息到聊天界面
     addMessage(message);
     // 发送消息已读
-    sendMessage("MsgRead", user.chatid);
+    sendMessage("MsgRead", chatId);
 
     // CloseGroup
   }, []);
 
   // 使用SignalR
   const { sendMessage } = useSignalR({
-    chatId: user.chatid,
-    area: user.area,
+    chatId: chatId,
+    area: area,
     onMessage: handleMessage,
   });
 
   // 初始化
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const username = params.get("username") || "";
-    const uid = params.get("uid") || "";
-    // 获取系统语言并设置 area
-    const area = navigator.language || navigator.languages[0] || "";
     if (!uid) {
       console.error("缺少 uid 参数，无法初始化用户信息");
       return;
     }
-    setUser((prevUser) => ({
-      ...prevUser,
-      username,
-      uid,
-      area,
-    }));
 
     // 获取当前用户对应的聊天组ID
     API.chat.getChatid(uid).then((res) => {
@@ -142,10 +130,7 @@ function App() {
         .createGroup(res, username, uid, navigator.language || "unknown")
         .then(() => {
           // 更新chatid状态
-          setUser((prevUser) => ({
-            ...prevUser,
-            chatid: res,
-          }));
+          setChatId(res);
 
           // 获取历史消息
           API.chat.getHistory(res, "").then((res) => {
@@ -163,10 +148,10 @@ function App() {
   function handleSend(type: string, val: string) {
     sendMessage(
       "SendMessageToGroup",
-      user.chatid,
+      chatId,
       val,
-      user.uid,
-      user.username,
+      uid,
+      username,
       ""
     );
   }
@@ -215,7 +200,7 @@ function App() {
   return (
     <Chat
       isX
-      locale={user.area}
+      locale={area}
       navbar={{ title: "智能助理" }}
       messages={messages}
       wideBreakpoint="800px"
