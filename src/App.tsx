@@ -92,7 +92,7 @@ function App() {
         });
       }
     }
-  }, []);
+  }, [appendMsg, messages]);
 
   // 判断是否显示时间
   function shouldShowTime(prevTime: number, currentTime: number) {
@@ -103,11 +103,8 @@ function App() {
     console.log(`收到消息:`, message);
     // 添加收到的消息到聊天界面
     addMessage(message);
-    // 发送消息已读
-    sendMessage("MsgRead", chatId);
-
     // CloseGroup
-  }, []);
+  }, [addMessage]);
 
   // 使用SignalR
   const { sendMessage } = useSignalR({

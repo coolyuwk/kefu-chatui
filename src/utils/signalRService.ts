@@ -27,6 +27,7 @@ export function useSignalR({ chatId, area, onMessage }: UseSignalROptions) {
     connection.on("ReceiveMessage", (message: ChatMessage) => {
       console.log("Message from server:", message);
       onMessage?.(message);
+      sendMessage("MsgRead", chatId);
     });
 
     connection
