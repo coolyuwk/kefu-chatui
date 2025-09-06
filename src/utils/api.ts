@@ -31,16 +31,18 @@ export const API = {
       );
       return JSON.parse(response);
     },
+
     // 获取当前群组ID
     getChatid: (uid: string) => {
       return apiClient.get(`/kefu/getChatId/${uid}`);
     },
+
     // 创建群组
     createGroup: (
       chatId: string,
       username: string | null,
       uid: string,
-      area: string| null
+      area: string | null
     ) => {
       return apiClient.post(`/kefu/createGroup`, {
         groupId: chatId,

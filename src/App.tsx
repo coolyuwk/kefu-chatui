@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useId } from "react";
+import React, { useEffect, useState, useCallback, useId, useRef } from "react";
 import type { UserModel } from "./types/userModel";
 import { Config } from "./utils/config";
 import type { ChatMessage } from "./types/chatMessage";
@@ -23,23 +23,30 @@ import "@chatui/core/dist/index.css";
 function App() {
   const themeJson = Config.theme;
   console.log(`theme:`, themeJson);
+
   const theme = JSON.parse(decodeURIComponent(themeJson));
   const { messages, appendMsg } = useMessages([]);
-  const [chatId, setChatId] = useState("");
+  const chatIdRef = useRef("");
   const params = new URLSearchParams(window.location.search);
-  const username = params.get("username") || "";
-  const uid = params.get("uid") || "";
+  const userNameRef = useRef("");
+  const uidRed = useRef("");
+
   // 获取系统语言并设置 area
-  const area = navigator.language || navigator.languages[0] || "";
-  const [groupIsClose, setGroupIsClose] = useState(false);
+  const areaRef = useRef("");
+  const groupIsCloseRef = useRef(false);
+  const initRef = useRef(false);
 
   // 点击预设问题时，发送消息给服务器
   function answer(questionId: string) {
-    if (groupIsClose) {
+    if (groupIsCloseRef.current) {
       return;
     }
-    console.log(`点击预设问题时，发送消息给服务器:`, questionId, chatId);
-    sendMessage("QuestionAsync", questionId, chatId);
+    console.log(
+      `点击预设问题时，发送消息给服务器:`,
+      questionId,
+      chatIdRef.current
+    );
+    sendMessage("QuestionAsync", questionId, chatIdRef.current);
   }
 
   // 收到消息时，添加到聊天界面
@@ -101,29 +108,39 @@ function App() {
 
   // 使用SignalR
   const { sendMessage } = useSignalR({
-    chatId: chatId,
-    area: area,
+    chatId: chatIdRef.current,
+    area: areaRef.current,
     onMessage: addMessage,
   });
 
-  // 初始化
-  useEffect(() => {
-    if (!uid) {
+  // 初始化函数
+  const initializeApp = useCallback(() => {
+    // 这里放置你需要在首次加载时执行的初始化逻辑
+    console.log("App initialized");
+
+    // 设置状态值
+    userNameRef.current = params.get("username") || "";
+    uidRed.current = params.get("uid") || "";
+    areaRef.current = navigator.language || navigator.languages[0] || "";
+    if (!params.get("uid")) {
       console.error("缺少 uid 参数，无法初始化用户信息");
       return;
     }
 
     // 获取当前用户对应的聊天组ID
-    API.chat.getChatid(uid).then((res) => {
+    API.chat.getChatid(uidRed.current).then((res) => {
+      chatIdRef.current = res;
       // 按需创建新的聊天组
       API.chat
-        .createGroup(res, username, uid, navigator.language || "unknown")
+        .createGroup(
+          chatIdRef.current,
+          userNameRef.current,
+          uidRed.current,
+          areaRef.current
+        )
         .then(() => {
-          // 更新chatid状态
-          setChatId(res);
-
           // 获取历史消息
-          API.chat.getHistory(res, "").then((res) => {
+          API.chat.getHistory(chatIdRef.current, "").then((res) => {
             // 添加历史消息到聊天界面
             console.log("历史消息:", res);
             res.list.forEach((item: ChatMessage) => {
@@ -132,11 +149,26 @@ function App() {
           });
         });
     });
-  }, [uid, username]);
+  }, [params]); // 补全依赖数组
+
+  // 在组件首次加载时运行初始化函数
+  useEffect(() => {
+    if (!initRef.current) {
+      initRef.current = true;
+      initializeApp();
+    }
+  }, [initializeApp]);
 
   // 发送消息
   function handleSend(type: string, val: string) {
-    sendMessage("SendMessageToGroup", chatId, val, uid, username, "");
+    sendMessage(
+      "SendMessageToGroup",
+      chatIdRef.current,
+      val,
+      uidRed.current,
+      userNameRef.current,
+      ""
+    );
   }
 
   // 自定义消息渲染
@@ -183,7 +215,7 @@ function App() {
   return (
     <Chat
       isX
-      locale={area}
+      locale={areaRef.current}
       navbar={{ title: "智能助理" }}
       messages={messages}
       wideBreakpoint="800px"
