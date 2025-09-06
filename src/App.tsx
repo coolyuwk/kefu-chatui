@@ -43,7 +43,7 @@ function App() {
   }
 
   // 收到消息时，添加到聊天界面
-  const addMessage = useCallback((item: ChatMessage) => {
+  function addMessage(item: ChatMessage) {
     console.log(`收到消息时，添加到聊天界面:`, item);
     // 创建基础消息对象，包含所有消息的公共属性
     const createBaseMessage = () => ({
@@ -92,25 +92,18 @@ function App() {
         });
       }
     }
-  }, [appendMsg, messages]);
+  }
 
   // 判断是否显示时间
   function shouldShowTime(prevTime: number, currentTime: number) {
     return currentTime - prevTime > 10 * 60 * 1000; // 超过10分钟才显示时间
   }
-  // 处理收到的消息
-  const handleMessage = useCallback((message: ChatMessage) => {
-    console.log(`收到消息:`, message);
-    // 添加收到的消息到聊天界面
-    addMessage(message);
-    // CloseGroup
-  }, [addMessage]);
 
   // 使用SignalR
   const { sendMessage } = useSignalR({
     chatId: chatId,
     area: area,
-    onMessage: handleMessage,
+    onMessage: addMessage,
   });
 
   // 初始化
@@ -139,18 +132,11 @@ function App() {
           });
         });
     });
-  }, []);
+  }, [uid, username]);
 
   // 发送消息
   function handleSend(type: string, val: string) {
-    sendMessage(
-      "SendMessageToGroup",
-      chatId,
-      val,
-      uid,
-      username,
-      ""
-    );
+    sendMessage("SendMessageToGroup", chatId, val, uid, username, "");
   }
 
   // 自定义消息渲染
