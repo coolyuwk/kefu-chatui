@@ -4,6 +4,7 @@ import { Config } from "./utils/config";
 import type { ChatMessage } from "./types/chatMessage";
 import { API } from "./utils/api";
 import { useSignalR } from "./utils/signalRService";
+
 import "./App.css";
 // 引入组件
 import Chat, {
@@ -20,6 +21,9 @@ import Chat, {
 import "@chatui/core/dist/index.css";
 
 function App() {
+  const themeJson = Config.theme;
+  console.log(`theme:`, themeJson);
+  const theme = JSON.parse(decodeURIComponent(themeJson));
   const { messages, appendMsg } = useMessages([]);
   const [user, setUser] = useState<UserModel>({
     username: "",
