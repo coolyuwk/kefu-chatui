@@ -11,7 +11,10 @@ import Chat, {
   RichText,
   MessageProps,
   useMessages,
-  toast,
+  Card,
+  CardContent,
+  List,
+  ListItem,
 } from "@chatui/core";
 // 引入样式
 import "@chatui/core/dist/index.css";
@@ -25,9 +28,20 @@ function App() {
     chatid: "",
   });
 
-  const addMessage = useCallback((item: ChatMessage) => {
-    console.log(`添加消息:`, Config.kefuAvatar);
+  const [groupIsClose, setGroupIsClose] = useState(false);
 
+  // 点击预设问题时，发送消息给服务器
+  function answer(questionId: string) {
+    if (groupIsClose) {
+      return;
+    }
+    console.log(`点击预设问题时，发送消息给服务器:`, questionId, user.chatid);
+    sendMessage("QuestionAsync", questionId, user.chatid);
+  }
+
+  // 收到消息时，添加到聊天界面
+  const addMessage = useCallback((item: ChatMessage) => {
+    console.log(`收到消息时，添加到聊天界面:`, item);
     // 创建基础消息对象，包含所有消息的公共属性
     const createBaseMessage = () => ({
       position: item.isKefu ? ("left" as const) : ("right" as const),
@@ -44,24 +58,40 @@ function App() {
         ),
     });
 
-    if (item.msg !== "") {
+    // 处理文本部分
+    if (item.msg) {
       appendMsg({
         ...createBaseMessage(),
         type: "html",
-        content: { html: item.showMsg },
+        content: { html: item.showMsg === "" ? item.msg : item.showMsg },
       });
     }
 
-    if (item.msgModel && item.msgModel.imageModels) {
-      item.msgModel.imageModels.forEach((imgItem) => {
+    if (item.msgModel) {
+      // 处理图片部分
+      if (item.msgModel.imageModels) {
+        item.msgModel.imageModels.forEach((imgItem) => {
+          appendMsg({
+            ...createBaseMessage(),
+            type: "image",
+            content: { src: imgItem.url },
+          });
+        });
+      }
+
+      // 处理预设问题部分
+      if (item.msgModel.questionList) {
+        console.log(`预设问题:`, item.msgModel.questionList);
         appendMsg({
           ...createBaseMessage(),
-          type: "image",
-          content: { src: imgItem.url },
+          type: "question",
+          content: { list: item.msgModel.questionList },
         });
-      });
+      }
     }
   }, []);
+
+  // 判断是否显示时间
   function shouldShowTime(prevTime: number, currentTime: number) {
     return currentTime - prevTime > 10 * 60 * 1000; // 超过10分钟才显示时间
   }
@@ -76,12 +106,14 @@ function App() {
     // CloseGroup
   }, []);
 
+  // 使用SignalR
   const { sendMessage } = useSignalR({
     chatId: user.chatid,
     area: user.area,
     onMessage: handleMessage,
   });
 
+  // 初始化
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const username = params.get("username") || "";
@@ -123,6 +155,7 @@ function App() {
     });
   }, []);
 
+  // 发送消息
   function handleSend(type: string, val: string) {
     sendMessage(
       "SendMessageToGroup",
@@ -134,6 +167,7 @@ function App() {
     );
   }
 
+  // 自定义消息渲染
   function renderMessageContent(msg: MessageProps) {
     const { type, content } = msg;
     // 处理HTML类型消息
@@ -151,6 +185,25 @@ function App() {
         </Bubble>
       );
     }
+    if (type === "question") {
+      return (
+        <Card>
+          <CardContent>
+            <List variant="buttons">
+              {content.list.map((item: any, index: number) => (
+                <ListItem
+                  key={index}
+                  content={item.question}
+                  as="button"
+                  ellipsis
+                  onClick={() => answer(item.questionId)}
+                />
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      );
+    }
     // 默认处理文本类型消息
     return <Bubble content={content.text} />;
   }
@@ -158,15 +211,13 @@ function App() {
   return (
     <Chat
       isX
-      
       locale={user.area}
       navbar={{ title: "智能助理" }}
       messages={messages}
       wideBreakpoint="800px"
-
       renderMessageContent={renderMessageContent}
       onSend={handleSend}
-      toolbar={[{ type: 'image', icon: 'image', title: '图片' }]}
+      toolbar={[{ type: "image", icon: "image", title: "图片" }]}
       onImageSend={() => Promise.resolve()}
     />
   );
