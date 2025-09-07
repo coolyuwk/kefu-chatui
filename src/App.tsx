@@ -1,5 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
-import type { UserModel } from "./types/userModel";
+import React, { useCallback, useRef } from "react";
 import { Config } from "./utils/config";
 import ChatContainer from "./components/ChatContainer";
 

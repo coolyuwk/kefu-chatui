@@ -23,7 +23,11 @@ interface ChatContainerProps {
   area: string;
 }
 
-const ChatContainer: React.FC<ChatContainerProps> = ({ uid, username, area }) => {
+const ChatContainer: React.FC<ChatContainerProps> = ({
+  uid,
+  username,
+  area,
+}) => {
   const { messages, appendMsg } = useMessages([]);
   const chatIdRef = useRef("");
   const groupIsCloseRef = useRef(false);
@@ -33,16 +37,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ uid, username, area }) =>
     if (groupIsCloseRef.current) {
       return;
     }
-    console.log(
-      `点击预设问题时，发送消息给服务器:`,
-      questionId,
-      chatIdRef.current
-    );
     sendMessage("QuestionAsync", questionId, chatIdRef.current);
   }
 
   // 收到消息时，添加到聊天界面
-  function addMessage(item: ChatMessage) {
+  const addMessage = useCallback((item: ChatMessage) => {
     console.log(`收到消息时，添加到聊天界面:`, item);
     // 创建基础消息对象，包含所有消息的公共属性
     const createBaseMessage = () => ({
@@ -91,7 +90,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ uid, username, area }) =>
         });
       }
     }
-  }
+  }, [appendMsg]);
 
   // 判断是否显示时间
   function shouldShowTime(prevTime: number, currentTime: number) {
@@ -99,42 +98,39 @@ const ChatContainer: React.FC<ChatContainerProps> = ({ uid, username, area }) =>
   }
 
   // 使用SignalR
-  const { sendMessage } = useSignalR({
-    chatId: chatIdRef.current,
-    area,
+  const { sendMessage, isConnected } = useSignalR({
     onMessage: addMessage,
   });
+  const initRef = useRef(false);
+  // 在组件首次加载时运行初始化函数
+  useEffect(() => {
+    if (isConnected && chatIdRef.current) {
+      // 加入聊天室
+      console.log("加入聊天室:", chatIdRef.current);
+      sendMessage("JoinGroup", chatIdRef.current, area || "");
+    } else {
+      console.log("连接断开，等待重连中...");
+    }
 
-  // 初始化函数
-  const initializeChat = useCallback(() => {
+    if (initRef.current) return;
+    initRef.current = true;
     // 获取当前用户对应的聊天组ID
     API.chat.getChatid(uid).then((res) => {
       chatIdRef.current = res;
+
       // 按需创建新的聊天组
-      API.chat
-        .createGroup(
-          chatIdRef.current,
-          username,
-          uid,
-          area
-        )
-        .then(() => {
-          // 获取历史消息
-          API.chat.getHistory(chatIdRef.current, "").then((res) => {
-            // 添加历史消息到聊天界面
-            console.log("历史消息:", res);
-            res.list.forEach((item: ChatMessage) => {
-              addMessage(item);
-            });
+      API.chat.createGroup(chatIdRef.current, username, uid, area).then(() => {
+        // 获取历史消息
+        API.chat.getHistory(chatIdRef.current, "").then((res) => {
+          // 添加历史消息到聊天界面
+          console.log("历史消息:", res);
+          res.list.forEach((item: ChatMessage) => {
+            addMessage(item);
           });
         });
+      });
     });
-  }, [uid, username, area]);
-
-  // 在组件首次加载时运行初始化函数
-  useEffect(() => {
-    initializeChat();
-  }, [initializeChat]);
+  }, [isConnected, chatIdRef, addMessage]);
 
   // 发送消息
   function handleSend(type: string, val: string) {

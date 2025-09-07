@@ -1,56 +1,64 @@
 import * as signalR from "@microsoft/signalr";
+import { useEffect, useRef, useState } from "react";
 import { Config } from "./config";
-import { useEffect, useRef } from "react";
 import type { ChatMessage } from "../types/chatMessage";
 
 interface UseSignalROptions {
-  chatId?: string;
-  area?: string;
   onMessage?: (message: ChatMessage) => void;
 }
 
-export function useSignalR({ chatId, area, onMessage }: UseSignalROptions) {
+export function useSignalR({ onMessage }: UseSignalROptions) {
   const connectionRef = useRef<signalR.HubConnection | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // 如果chatId为空，则不建立连接
-    if (!chatId) return;
+    console.log("useSignalR");
 
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(`${Config.signalRUrl}`, {
         transport: signalR.HttpTransportType.WebSockets,
         withCredentials: true,
       })
-      .withAutomaticReconnect()
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: () => 3000, // 可自定义重连间隔
+      })
       .build();
 
     connection.on("ReceiveMessage", (message: ChatMessage) => {
       console.log("Message from server:", message);
       onMessage?.(message);
-      sendMessage("MsgRead", chatId);
+    });
+
+    connection.onclose((error) => {
+      console.warn("SignalR disconnected", error);
+      setIsConnected(false);
+    });
+
+    connection.onreconnected(() => {
+      console.log("SignalR reconnected");
+      setIsConnected(true);
     });
 
     connection
       .start()
       .then(() => {
         console.log("SignalR connected");
-        // 连接成功后加入聊天室
-        connection.invoke("JoinGroup", chatId, area || "");
+        setIsConnected(true);
       })
       .catch((err) => {
         console.error("SignalR connection error:", err);
+        setIsConnected(false);
       });
 
     connectionRef.current = connection;
 
     return () => {
-      if (connectionRef.current) {
-        connectionRef.current.stop().then(() => {
-          console.log("SignalR disconnected");
-        });
-      }
+      connectionRef.current?.stop().then(() => {
+        console.log("SignalR disconnected");
+        setIsConnected(false);
+      });
     };
-  }, [chatId, area]); // 只有当chatId或area变化时才重新连接
+  }, []);
 
   const sendMessage = (method: string, ...args: any[]) => {
     if (
@@ -65,5 +73,5 @@ export function useSignalR({ chatId, area, onMessage }: UseSignalROptions) {
     }
   };
 
-  return { sendMessage };
+  return { sendMessage, isConnected };
 }
