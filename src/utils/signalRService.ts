@@ -10,7 +10,7 @@ interface UseSignalROptions {
 export function useSignalR({ onMessage }: UseSignalROptions) {
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-
+  const onMessageRef = useRef(onMessage);
   useEffect(() => {
     console.log("useSignalR");
 
@@ -26,7 +26,7 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
 
     connection.on("ReceiveMessage", (message: ChatMessage) => {
       console.log("Message from server:", message);
-      onMessage?.(message);
+      onMessageRef.current?.(message);
     });
 
     connection.onclose((error) => {
