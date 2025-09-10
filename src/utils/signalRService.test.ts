@@ -36,7 +36,7 @@ describe('SignalR Connection Management', () => {
 
   it('should validate connection management flags', () => {
     // Simulate the connection management logic with flags
-    let connectionRef = null;
+    let connectionRef: any = null;
     let isConnectingRef = false;
 
     // Test prevention of multiple connections
@@ -51,3 +51,5 @@ describe('SignalR Connection Management', () => {
     expect(shouldCreateConnection()).toBe(false);
   });
 });
+
+export {};
