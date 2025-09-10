@@ -159,30 +159,33 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     );
   }
 
-  // 处理图片发送
-  const handleImageSend = (file?: File): Promise<any> => {
-    console.log("图片发送:", file);
-    return new Promise((resolve) => {
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          appendMsg({
-            type: 'image',
-            content: { src: evt.target?.result as string },
-            position: 'right',
-            user: {
-              avatar: Config.userAvatar,
-              name: username,
-            },
-            createdAt: Date.now(),
-          });
-          resolve(true);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        fileInputRef.current?.click();
+  // 处理图片发送，改为API接口上传
+  const handleImageSend = async (file?: File): Promise<any> => {
+    if (file) {
+      try {
+        const result = await API.chat.uploadFile(file);
+        // result.url 为图片地址
+        // appendMsg({
+        //   type: 'image',
+        //   content: { src: result.url },
+        //   position: 'right',
+        //   user: {
+        //     avatar: Config.userAvatar,
+        //     name: username,
+        //   },
+        //   createdAt: Date.now(),
+        // });
+        // 可在此处通过 sendMessage 发送图片消息到服务端
+        sendMessage("SendMessageToGroup", chatIdRef.current, "", uid, username, result.url);
+        return true;
+      } catch (err) {
+        console.error('图片上传失败', err);
+        return false;
       }
-    });
+    } else {
+      fileInputRef.current?.click();
+      return false;
+    }
   };
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

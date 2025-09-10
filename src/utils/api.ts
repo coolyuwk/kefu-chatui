@@ -18,6 +18,21 @@ class ApiClient {
     if (!res.ok) throw new Error(`POST ${path} failed`);
     return res.text();
   }
+
+  async uploadFile(path: string, file: File, formData: Record<string, any> = {}): Promise<string> {
+    const data = new FormData();
+    data.append("file", file);
+    Object.entries(formData).forEach(([key, value]) => {
+      data.append(key, value);
+    });
+
+    const res = await fetch(`${Config.baseURL}${path}`, {
+      method: "POST",
+      body: data,
+    });
+    if (!res.ok) throw new Error(`UPLOAD ${path} failed`);
+    return res.text();
+  }
 }
 
 export const apiClient = new ApiClient();
@@ -50,6 +65,11 @@ export const API = {
         userName: username,
         area: area,
       });
+    },
+
+    uploadFile: async (file: File, formData: Record<string, any> = {}) => {
+      const response = await apiClient.uploadFile("/kefu/upfile", file, formData);
+      return JSON.parse(response); // 返回上传结果对象
     },
   },
 };
