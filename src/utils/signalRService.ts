@@ -5,12 +5,14 @@ import type { ChatMessage } from "../types/chatMessage";
 
 interface UseSignalROptions {
   onMessage?: (message: ChatMessage) => void;
+  onCloseGroup?: (payload: { groupId: string; userName?: string }) => void;
 }
 
-export function useSignalR({ onMessage }: UseSignalROptions) {
+export function useSignalR({ onMessage, onCloseGroup }: UseSignalROptions) {
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const onMessageRef = useRef(onMessage);
+  const onCloseGroupRef = useRef<UseSignalROptions['onCloseGroup']>();
   const isConnectingRef = useRef(false);
   // 新增：重连回调
   const onReconnectedRef = useRef<(() => void) | undefined>();
@@ -19,6 +21,10 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
   useEffect(() => {
     onMessageRef.current = onMessage;
   }, [onMessage]);
+
+  useEffect(() => {
+    onCloseGroupRef.current = onCloseGroup;
+  }, [onCloseGroup]);
 
   useEffect(() => {
     // Prevent multiple simultaneous connections
@@ -47,6 +53,12 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
       conn.on("ReceiveMessage", (message: ChatMessage) => {
         console.log("Message from server:", message);
         onMessageRef.current?.(message);
+      });
+
+      conn.off("CloseGroup");
+      conn.on("CloseGroup", (payload: { groupId: string; userName?: string }) => {
+        console.log("CloseGroup from server:", payload);
+        onCloseGroupRef.current?.(payload);
       });
     }
 

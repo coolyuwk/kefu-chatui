@@ -128,8 +128,30 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }
 
   // 使用SignalR
+  const [sessionClosed, setSessionClosed] = useState(false);
+
   const { sendMessage, isConnected, setOnReconnected } = useSignalR({
     onMessage: addMessage,
+    onCloseGroup: ({ groupId, userName }) => {
+      // 仅处理当前会话
+      if (groupId && groupId === chatIdRef.current) {
+        // 系统消息
+        appendMsgRef.current({
+          type: "text",
+          content: { text: `系统：${userName || "系统"}已关闭此会话` },
+          position: "left",
+          user: { avatar: Config.kefuAvatar, name: userName || "系统" },
+          createdAt: Date.now(),
+          hasTime:
+            messagesRef.current.length > 1 &&
+            shouldShowTime(
+              messagesRef.current[messagesRef.current.length - 1].createdAt || 0,
+              Date.now()
+            ),
+        } as MessageProps);
+        setSessionClosed(true);
+      }
+    },
   });
   useEffect(() => {
   console.log('isConnected:', isConnected);
@@ -279,8 +301,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const [inputDisabled, setInputDisabled] = useState(false);
 
   useEffect(() => {
-    setInputDisabled(!isConnected);
-  }, [isConnected]);
+    setInputDisabled(!isConnected || sessionClosed);
+  }, [isConnected, sessionClosed]);
 
   return (
     <>
@@ -293,7 +315,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         renderMessageContent={renderMessageContent}
         onSend={handleSend}
         inputOptions={{ disabled: inputDisabled }}
-        toolbar={[{ type: "image", icon: "image", title: "图片" }]}
+  toolbar={[{ type: "image", icon: "image", title: sessionClosed ? "会话已关闭" : "图片" }]}
         onToolbarClick={(item, e) => {
           if (inputDisabled) return;
           if (item.type === "image") {
