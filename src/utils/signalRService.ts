@@ -36,7 +36,7 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
         withCredentials: true,
       })
       .withAutomaticReconnect({
-        nextRetryDelayInMilliseconds: () => 3000, // 可自定义重连间隔
+        nextRetryDelayInMilliseconds: () => 3000, // 离线检测间隔缩短为 1 秒
       })
       .build();
 
@@ -50,10 +50,17 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
 
     registerHandlers(connection);
 
+
     connection.onclose((error) => {
       console.warn("SignalR disconnected", error);
       setIsConnected(false);
       isConnectingRef.current = false;
+    });
+
+    // 新增：重连中也设置为断开状态
+    connection.onreconnecting(() => {
+      console.log("SignalR reconnecting...");
+      setIsConnected(false);
     });
 
     connection.onreconnected(() => {

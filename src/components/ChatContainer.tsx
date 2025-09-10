@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useRef } from "react";
+import React, { useEffect, useCallback, useRef, useState } from "react";
 import type { ChatMessage } from "../types/chatMessage";
 import { Config } from "../utils/config";
 import { API } from "../utils/api";
@@ -47,64 +47,80 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }
 
   // 公共消息对象构造函数
-  const createBaseMessage = useCallback((item: ChatMessage): MessageProps => {
-    return {
-      _id: `${item.id}`,
-      position: item.isKefu ? ("left" as const) : ("right" as const),
-      user: {
-        avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
-        name: item.userName,
-      },
-      createdAt: Date.parse(item.creationTime),
-      hasTime:
-        messagesRef.current.length > 1 &&
-        shouldShowTime(
-          messagesRef.current[messagesRef.current.length - 1].createdAt || 0,
-          Date.parse(item.creationTime)
-        ),
-      type: "text",
-      content: { text: item.msg || "" },
-    };
-  }, [messagesRef]);
+  const createBaseMessage = useCallback(
+    (item: ChatMessage): MessageProps => {
+      return {
+        _id: `${item.id}`,
+        position: item.isKefu ? ("left" as const) : ("right" as const),
+        user: {
+          avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
+          name: item.userName,
+        },
+        createdAt: Date.parse(item.creationTime),
+        hasTime:
+          messagesRef.current.length > 1 &&
+          shouldShowTime(
+            messagesRef.current[messagesRef.current.length - 1].createdAt || 0,
+            Date.parse(item.creationTime)
+          ),
+        type: "text",
+        content: { text: item.msg || "" },
+      };
+    },
+    [messagesRef]
+  );
 
   // 消息类型转换统一处理
-  const convertToMessageProps = useCallback((item: ChatMessage): MessageProps[] => {
-    const base = createBaseMessage(item);
-    if (item.msg) {
-      return [{
-        ...base,
-        type: "html",
-        content: { html: item.showMsg === "" ? item.msg : item.showMsg },
-      }];
-    }
-    if (item.msgModel?.imageModels) {
-      return item.msgModel.imageModels.map((imgItem, imgIdx) => ({
-        ...base,
-        _id: `${item.creationTime}-img-${imgIdx}`,
-        type: "image",
-        content: { src: imgItem.url },
-      }));
-    }
-    if (item.msgModel?.questionList) {
-      return [{
-        ...base,
-        type: "question",
-        content: { list: item.msgModel.questionList },
-      }];
-    }
-    return [base];
-  }, [createBaseMessage]);
+  const convertToMessageProps = useCallback(
+    (item: ChatMessage): MessageProps[] => {
+      const base = createBaseMessage(item);
+      if (item.msg) {
+        return [
+          {
+            ...base,
+            type: "html",
+            content: { html: item.showMsg === "" ? item.msg : item.showMsg },
+          },
+        ];
+      }
+      if (item.msgModel?.imageModels) {
+        return item.msgModel.imageModels.map((imgItem, imgIdx) => ({
+          ...base,
+          _id: `${item.creationTime}-img-${imgIdx}`,
+          type: "image",
+          content: { src: imgItem.url },
+        }));
+      }
+      if (item.msgModel?.questionList) {
+        return [
+          {
+            ...base,
+            type: "question",
+            content: { list: item.msgModel.questionList },
+          },
+        ];
+      }
+      return [base];
+    },
+    [createBaseMessage]
+  );
 
   // 初始化消息列表，批量转换并插入
-  const addMessages = useCallback((items: ChatMessage[]) => {
-    const newMessages: MessageProps[] = items.flatMap(convertToMessageProps);
-    prependMsgs(newMessages);
-  }, [convertToMessageProps, prependMsgs]);
+  const addMessages = useCallback(
+    (items: ChatMessage[]) => {
+      const newMessages: MessageProps[] = items.flatMap(convertToMessageProps);
+      prependMsgs(newMessages);
+    },
+    [convertToMessageProps, prependMsgs]
+  );
 
   // 收到消息时，添加到聊天界面
-  const addMessage = useCallback((item: ChatMessage) => {
-    convertToMessageProps(item).forEach(msg => appendMsgRef.current(msg));
-  }, [convertToMessageProps]);
+  const addMessage = useCallback(
+    (item: ChatMessage) => {
+      convertToMessageProps(item).forEach((msg) => appendMsgRef.current(msg));
+    },
+    [convertToMessageProps]
+  );
 
   // 判断是否显示时间
   function shouldShowTime(prevTime: number, currentTime: number) {
@@ -115,6 +131,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const { sendMessage, isConnected, setOnReconnected } = useSignalR({
     onMessage: addMessage,
   });
+  useEffect(() => {
+  console.log('isConnected:', isConnected);
+}, [isConnected]);
+
   const sendMessageRef = useRef(sendMessage);
   const initRef = useRef(false);
 
@@ -187,17 +207,6 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     if (file) {
       try {
         const result = await API.chat.uploadFile(file);
-        // result.url 为图片地址
-        // appendMsg({
-        //   type: 'image',
-        //   content: { src: result.url },
-        //   position: 'right',
-        //   user: {
-        //     avatar: Config.userAvatar,
-        //     name: username,
-        //   },
-        //   createdAt: Date.now(),
-        // });
         // 可在此处通过 sendMessage 发送图片消息到服务端
         sendMessage(
           "SendMessageToGroup",
@@ -266,6 +275,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     return <Bubble content={content.text} />;
   }
 
+  // 输入框禁用状态
+  const [inputDisabled, setInputDisabled] = useState(false);
+
+  useEffect(() => {
+    setInputDisabled(!isConnected);
+  }, [isConnected]);
+
   return (
     <>
       <Chat
@@ -276,8 +292,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         wideBreakpoint="800px"
         renderMessageContent={renderMessageContent}
         onSend={handleSend}
+        inputOptions={{ disabled: inputDisabled }}
         toolbar={[{ type: "image", icon: "image", title: "图片" }]}
         onToolbarClick={(item, e) => {
+          if (inputDisabled) return;
           if (item.type === "image") {
             handleImageSend();
           }
@@ -289,6 +307,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         accept="image/*"
         style={{ display: "none" }}
         onChange={onFileChange}
+        disabled={inputDisabled}
       />
     </>
   );
