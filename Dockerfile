@@ -16,7 +16,7 @@ RUN npm install --legacy-peer-deps
 # Copy source and build
 COPY . .
 # Prefer prod build script if present, fallback to default build
-RUN npm run build:prod || npm run build
+RUN npm run build:prod
 
 ########################
 # Run stage
