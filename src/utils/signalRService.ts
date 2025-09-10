@@ -11,8 +11,22 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const onMessageRef = useRef(onMessage);
+  const isConnectingRef = useRef(false);
+  
+  // Update onMessage ref when it changes
   useEffect(() => {
-    console.log("useSignalR");
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
+
+  useEffect(() => {
+    // Prevent multiple simultaneous connections
+    if (connectionRef.current || isConnectingRef.current) {
+      console.log("SignalR connection already exists or is being created, skipping...");
+      return;
+    }
+
+    console.log("useSignalR: Creating new connection");
+    isConnectingRef.current = true;
 
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(`${Config.signalRUrl}`, {
@@ -32,6 +46,7 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
     connection.onclose((error) => {
       console.warn("SignalR disconnected", error);
       setIsConnected(false);
+      isConnectingRef.current = false;
     });
 
     connection.onreconnected(() => {
@@ -39,24 +54,46 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
       setIsConnected(true);
     });
 
+    connectionRef.current = connection;
+
     connection
       .start()
       .then(() => {
         console.log("SignalR connected");
         setIsConnected(true);
+        isConnectingRef.current = false;
       })
       .catch((err) => {
         console.error("SignalR connection error:", err);
+        // Handle negotiation abort gracefully
+        if (err.name === 'AbortError' && err.message.includes('stopped during negotiation')) {
+          console.log("Connection was aborted during negotiation (likely due to cleanup), this is expected in development mode");
+        }
         setIsConnected(false);
+        isConnectingRef.current = false;
       });
-
-    connectionRef.current = connection;
 
     return () => {
-      connectionRef.current?.stop().then(() => {
-        console.log("SignalR disconnected");
+      if (connectionRef.current) {
+        const currentConnection = connectionRef.current;
+        console.log("SignalR cleanup: stopping connection");
+        
+        // Only stop if connection is not already disconnected
+        if (currentConnection.state !== signalR.HubConnectionState.Disconnected) {
+          currentConnection.stop().then(() => {
+            console.log("SignalR cleanup completed");
+          }).catch((error) => {
+            // Ignore abort errors during cleanup as they're expected
+            if (error.name !== 'AbortError') {
+              console.error("Error during SignalR cleanup:", error);
+            }
+          });
+        }
+        
+        connectionRef.current = null;
         setIsConnected(false);
-      });
+        isConnectingRef.current = false;
+      }
     };
   }, []);
 
