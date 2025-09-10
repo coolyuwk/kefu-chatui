@@ -15,7 +15,6 @@ import Chat, {
   CardContent,
   List,
   ListItem,
-  SystemMessage,
 } from "@chatui/core";
 
 interface ChatContainerProps {
@@ -65,7 +64,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
             messagesRef.current[messagesRef.current.length - 1].createdAt || 0,
             Date.parse(item.creationTime)
           ),
-        type: "text",
+        type: "html",
         content: { text: item.msg || "" },
       };
     },
