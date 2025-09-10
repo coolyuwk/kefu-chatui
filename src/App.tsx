@@ -9,7 +9,8 @@ function App() {
   console.log(`theme:`, themeJson);
 
   const theme = JSON.parse(decodeURIComponent(themeJson));
-  const params = new URLSearchParams(window.location.search);
+  console.log("Parsed theme:", theme); // Use the theme variable to avoid unused warning
+  
   const userNameRef = useRef("");
   const uidRef = useRef("");
   const areaRef = useRef("");
@@ -24,13 +25,14 @@ function App() {
     console.log("App initialized");
 
     // 设置状态值
+    const params = new URLSearchParams(window.location.search);
     userNameRef.current = params.get("username") || "";
     uidRef.current = params.get("uid") || "";
     if (!params.get("uid")) {
       console.error("缺少 uid 参数，无法初始化用户信息");
       return;
     }
-  }, [params]); // 补全依赖数组
+  }, []); // Remove params dependency as it's now inside the callback
 
   // 在组件首次加载时运行初始化函数
   if (!initRef.current) {

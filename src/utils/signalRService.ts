@@ -11,8 +11,17 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const onMessageRef = useRef(onMessage);
+  const isConnectingRef = useRef(false);
+
   useEffect(() => {
-    console.log("useSignalR");
+    // Prevent duplicate connections during React StrictMode double-invocation
+    if (connectionRef.current || isConnectingRef.current) {
+      console.log("SignalR connection already exists or is being created, skipping");
+      return;
+    }
+
+    console.log("useSignalR - creating new connection");
+    isConnectingRef.current = true;
 
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(`${Config.signalRUrl}`, {
@@ -32,6 +41,7 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
     connection.onclose((error) => {
       console.warn("SignalR disconnected", error);
       setIsConnected(false);
+      isConnectingRef.current = false;
     });
 
     connection.onreconnected(() => {
@@ -44,19 +54,26 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
       .then(() => {
         console.log("SignalR connected");
         setIsConnected(true);
+        isConnectingRef.current = false;
       })
       .catch((err) => {
         console.error("SignalR connection error:", err);
         setIsConnected(false);
+        isConnectingRef.current = false;
       });
 
     connectionRef.current = connection;
 
     return () => {
-      connectionRef.current?.stop().then(() => {
-        console.log("SignalR disconnected");
-        setIsConnected(false);
-      });
+      if (connectionRef.current) {
+        console.log("SignalR cleanup - stopping connection");
+        connectionRef.current.stop().then(() => {
+          console.log("SignalR disconnected in cleanup");
+          setIsConnected(false);
+          connectionRef.current = null;
+          isConnectingRef.current = false;
+        });
+      }
     };
   }, []);
 
