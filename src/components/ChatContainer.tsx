@@ -103,11 +103,22 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }
 
   // 使用SignalR
-  const { sendMessage, isConnected } = useSignalR({
+  const { sendMessage, isConnected, setOnReconnected } = useSignalR({
     onMessage: addMessage,
   });
   const sendMessageRef = useRef(sendMessage);
   const initRef = useRef(false);
+
+  // 断线重连后自动JoinGroup
+  useEffect(() => {
+    setOnReconnected(() => {
+      if (chatIdRef.current) {
+        sendMessageRef.current("JoinGroup", chatIdRef.current, areaRef.current || "");
+        console.log("重连后自动加入群组:", chatIdRef.current);
+      }
+    });
+  }, [setOnReconnected]);
+
   // 在组件首次加载时运行初始化函数
   useEffect(() => {
     if (isConnected && chatIdRef.current) {

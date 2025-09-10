@@ -12,7 +12,9 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
   const [isConnected, setIsConnected] = useState(false);
   const onMessageRef = useRef(onMessage);
   const isConnectingRef = useRef(false);
-  
+  // 新增：重连回调
+  const onReconnectedRef = useRef<(() => void) | undefined>();
+
   // Update onMessage ref when it changes
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -38,10 +40,15 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
       })
       .build();
 
-    connection.on("ReceiveMessage", (message: ChatMessage) => {
-      console.log("Message from server:", message);
-      onMessageRef.current?.(message);
-    });
+    function registerHandlers(conn: signalR.HubConnection) {
+      conn.off("ReceiveMessage"); // 先移除旧监听器
+      conn.on("ReceiveMessage", (message: ChatMessage) => {
+        console.log("Message from server:", message);
+        onMessageRef.current?.(message);
+      });
+    }
+
+    registerHandlers(connection);
 
     connection.onclose((error) => {
       console.warn("SignalR disconnected", error);
@@ -52,6 +59,11 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
     connection.onreconnected(() => {
       console.log("SignalR reconnected");
       setIsConnected(true);
+      registerHandlers(connection); // 断线重连后重新注册事件
+      // 新增：重连后自动调用回调
+      if (onReconnectedRef.current) {
+        onReconnectedRef.current();
+      }
     });
 
     connectionRef.current = connection;
@@ -110,5 +122,12 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
     }
   };
 
-  return { sendMessage, isConnected };
+  // 新增：返回注册重连回调的API
+  return {
+    sendMessage,
+    isConnected,
+    setOnReconnected: (cb: () => void) => {
+      onReconnectedRef.current = cb;
+    }
+  };
 }
