@@ -67,6 +67,8 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          build-args: |
+            BUILD_TARGET=prod
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}

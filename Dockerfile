@@ -9,14 +9,18 @@ WORKDIR /app
 # Speed up installs in CI-like environments
 ENV CI=true
 
+# Build target (maps to npm script name suffix, e.g. build:prod / build:one)
+ARG BUILD_TARGET=prod
+
 # Install deps
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
 # Copy source and build
 COPY . .
-# Prefer prod build script if present, fallback to default build
-RUN npm run build:prod
+# Use passed build target script (e.g. build:prod or build:one)
+RUN echo "Building with npm run build:${BUILD_TARGET}" \
+	&& npm run build:${BUILD_TARGET}
 
 ########################
 # Run stage
