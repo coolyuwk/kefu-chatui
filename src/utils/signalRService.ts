@@ -23,7 +23,9 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
   useEffect(() => {
     // Prevent multiple simultaneous connections
     if (connectionRef.current || isConnectingRef.current) {
-      console.log("SignalR connection already exists or is being created, skipping...");
+      console.log(
+        "SignalR connection already exists or is being created, skipping..."
+      );
       return;
     }
 
@@ -49,7 +51,6 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
     }
 
     registerHandlers(connection);
-
 
     connection.onclose((error) => {
       console.warn("SignalR disconnected", error);
@@ -85,8 +86,13 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
       .catch((err) => {
         console.error("SignalR connection error:", err);
         // Handle negotiation abort gracefully
-        if (err.name === 'AbortError' && err.message.includes('stopped during negotiation')) {
-          console.log("Connection was aborted during negotiation (likely due to cleanup), this is expected in development mode");
+        if (
+          err.name === "AbortError" &&
+          err.message.includes("stopped during negotiation")
+        ) {
+          console.log(
+            "Connection was aborted during negotiation (likely due to cleanup), this is expected in development mode"
+          );
         }
         setIsConnected(false);
         isConnectingRef.current = false;
@@ -96,23 +102,70 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
       if (connectionRef.current) {
         const currentConnection = connectionRef.current;
         console.log("SignalR cleanup: stopping connection");
-        
+
         // Only stop if connection is not already disconnected
-        if (currentConnection.state !== signalR.HubConnectionState.Disconnected) {
-          currentConnection.stop().then(() => {
-            console.log("SignalR cleanup completed");
-          }).catch((error) => {
-            // Ignore abort errors during cleanup as they're expected
-            if (error.name !== 'AbortError') {
-              console.error("Error during SignalR cleanup:", error);
-            }
-          });
+        if (
+          currentConnection.state !== signalR.HubConnectionState.Disconnected
+        ) {
+          currentConnection
+            .stop()
+            .then(() => {
+              console.log("SignalR cleanup completed");
+            })
+            .catch((error) => {
+              // Ignore abort errors during cleanup as they're expected
+              if (error.name !== "AbortError") {
+                console.error("Error during SignalR cleanup:", error);
+              }
+            });
         }
-        
+
         connectionRef.current = null;
         setIsConnected(false);
         isConnectingRef.current = false;
       }
+    };
+  }, []);
+
+  // 监听浏览器网络状态，离线时立刻更新 UI 状态
+  useEffect(() => {
+    const handleOffline = () => {
+      console.log("Browser offline detected");
+      setIsConnected(false);
+      const conn = connectionRef.current;
+      if (conn && conn.state !== signalR.HubConnectionState.Disconnected) {
+        conn.stop().catch(() => {});
+      }
+    };
+
+    const handleOnline = () => {
+      console.log("Browser online detected");
+      const conn = connectionRef.current;
+      if (
+        conn &&
+        conn.state === signalR.HubConnectionState.Disconnected &&
+        !isConnectingRef.current
+      ) {
+        isConnectingRef.current = true;
+        conn
+          .start()
+          .then(() => {
+            setIsConnected(true);
+          })
+          .catch(() => {
+            setIsConnected(false);
+          })
+          .finally(() => {
+            isConnectingRef.current = false;
+          });
+      }
+    };
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
     };
   }, []);
 
@@ -135,6 +188,6 @@ export function useSignalR({ onMessage }: UseSignalROptions) {
     isConnected,
     setOnReconnected: (cb: () => void) => {
       onReconnectedRef.current = cb;
-    }
+    },
   };
 }
