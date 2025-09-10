@@ -8,8 +8,6 @@ function App() {
   const themeJson = Config.theme;
   console.log(`theme:`, themeJson);
 
-  const theme = JSON.parse(decodeURIComponent(themeJson));
-  const params = new URLSearchParams(window.location.search);
   const userNameRef = useRef("");
   const uidRef = useRef("");
   const areaRef = useRef("");
@@ -20,6 +18,7 @@ function App() {
 
   // 初始化函数
   const initializeApp = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
     // 这里放置你需要在首次加载时执行的初始化逻辑
     console.log("App initialized");
 
@@ -30,7 +29,7 @@ function App() {
       console.error("缺少 uid 参数，无法初始化用户信息");
       return;
     }
-  }, [params]); // 补全依赖数组
+  }, []);
 
   // 在组件首次加载时运行初始化函数
   if (!initRef.current) {
