@@ -47,9 +47,9 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }
 
   // 公共消息对象构造函数
-  function createBaseMessage(item: ChatMessage, idx?: number): MessageProps {
+  const createBaseMessage = useCallback((item: ChatMessage): MessageProps => {
     return {
-      _id: `${item.id || item.creationTime}${typeof idx === 'number' ? '-' + idx : ''}`,
+      _id: `${item.id}`,
       position: item.isKefu ? ("left" as const) : ("right" as const),
       user: {
         avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
@@ -65,74 +65,46 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       type: "text",
       content: { text: item.msg || "" },
     };
-  }
+  }, [messagesRef]);
+
+  // 消息类型转换统一处理
+  const convertToMessageProps = useCallback((item: ChatMessage): MessageProps[] => {
+    const base = createBaseMessage(item);
+    if (item.msg) {
+      return [{
+        ...base,
+        type: "html",
+        content: { html: item.showMsg === "" ? item.msg : item.showMsg },
+      }];
+    }
+    if (item.msgModel?.imageModels) {
+      return item.msgModel.imageModels.map((imgItem, imgIdx) => ({
+        ...base,
+        _id: `${item.creationTime}-img-${imgIdx}`,
+        type: "image",
+        content: { src: imgItem.url },
+      }));
+    }
+    if (item.msgModel?.questionList) {
+      return [{
+        ...base,
+        type: "question",
+        content: { list: item.msgModel.questionList },
+      }];
+    }
+    return [base];
+  }, [createBaseMessage]);
 
   // 初始化消息列表，批量转换并插入
   const addMessages = useCallback((items: ChatMessage[]) => {
-    const newMessages: MessageProps[] = items.flatMap((item, idx) => {
-      const base = createBaseMessage(item, idx);
-      if (item.msg) {
-        return {
-          ...base,
-          type: "html",
-          content: { html: item.showMsg === "" ? item.msg : item.showMsg },
-        };
-      }
-      if (item.msgModel?.imageModels) {
-        // 多图片消息拆分为多条
-        return item.msgModel.imageModels.map((imgItem, imgIdx) => ({
-          ...createBaseMessage(item, imgIdx),
-          _id: `${item.creationTime}-img-${imgIdx}`,
-          type: "image",
-          content: { src: imgItem.url },
-        }));
-      }
-      if (item.msgModel?.questionList) {
-        return {
-          ...base,
-          type: "question",
-          content: { list: item.msgModel.questionList },
-        };
-      }
-      return base;
-    });
+    const newMessages: MessageProps[] = items.flatMap(convertToMessageProps);
     prependMsgs(newMessages);
-  }, []);
+  }, [convertToMessageProps, prependMsgs]);
 
   // 收到消息时，添加到聊天界面
   const addMessage = useCallback((item: ChatMessage) => {
-    // 处理文本部分
-    if (item.msg) {
-      appendMsgRef.current({
-        ...createBaseMessage(item),
-        type: "html",
-        content: { html: item.showMsg === "" ? item.msg : item.showMsg },
-      });
-    }
-
-    if (item.msgModel) {
-      // 处理图片部分
-      if (item.msgModel.imageModels) {
-        item.msgModel.imageModels.forEach((imgItem, imgIdx) => {
-          appendMsgRef.current({
-            ...createBaseMessage(item, imgIdx),
-            _id: `${item.creationTime}-img-${imgIdx}`,
-            type: "image",
-            content: { src: imgItem.url },
-          });
-        });
-      }
-
-      // 处理预设问题部分
-      if (item.msgModel.questionList) {
-        appendMsgRef.current({
-          ...createBaseMessage(item),
-          type: "question",
-          content: { list: item.msgModel.questionList },
-        });
-      }
-    }
-  }, []);
+    convertToMessageProps(item).forEach(msg => appendMsgRef.current(msg));
+  }, [convertToMessageProps]);
 
   // 判断是否显示时间
   function shouldShowTime(prevTime: number, currentTime: number) {
@@ -193,13 +165,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
           API.chat.getHistory(chatIdRef.current, "").then((res) => {
             // 添加历史消息到聊天界面
             addMessages(res.list);
-            // res.list.forEach((item: ChatMessage) => {
-            //   addMessage(item);
-            // });
           });
         });
     });
-  }, [isConnected, chatIdRef, addMessage]);
+  }, [isConnected, chatIdRef, addMessage, addMessages]);
 
   // 发送消息
   function handleSend(type: string, val: string) {
