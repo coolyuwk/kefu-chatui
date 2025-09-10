@@ -15,6 +15,7 @@ import Chat, {
   CardContent,
   List,
   ListItem,
+  SystemMessage,
 } from "@chatui/core";
 
 interface ChatContainerProps {
@@ -32,7 +33,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const appendMsgRef = useRef(appendMsg);
   const messagesRef = useRef(messages);
   const chatIdRef = useRef("");
-  const groupIsCloseRef = useRef(false);
+  const [groupIsClose, setGroupIsClose] = useState(false); 
+  // 用于触发重新渲染
   const uidRef = useRef(uid);
   const areaRef = useRef(area);
   const userNameRef = useRef(username);
@@ -40,7 +42,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
   // 点击预设问题时，发送消息给服务器
   function answer(questionId: string) {
-    if (groupIsCloseRef.current) {
+    if (groupIsClose) {
       return;
     }
     sendMessage("QuestionAsync", questionId, chatIdRef.current);
@@ -128,34 +130,39 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }
 
   // 使用SignalR
-  const [sessionClosed, setSessionClosed] = useState(false);
 
   const { sendMessage, isConnected, setOnReconnected } = useSignalR({
     onMessage: addMessage,
     onCloseGroup: ({ groupId, userName }) => {
       // 仅处理当前会话
       if (groupId && groupId === chatIdRef.current) {
-        // 系统消息
-        appendMsgRef.current({
-          type: "text",
-          content: { text: `系统：${userName || "系统"}已关闭此会话` },
-          position: "left",
-          user: { avatar: Config.kefuAvatar, name: userName || "系统" },
-          createdAt: Date.now(),
-          hasTime:
-            messagesRef.current.length > 1 &&
-            shouldShowTime(
-              messagesRef.current[messagesRef.current.length - 1].createdAt || 0,
-              Date.now()
-            ),
-        } as MessageProps);
-        setSessionClosed(true);
+        // 封装插入系统消息并支持按钮回调
+        const pushSystemMessage = (
+          text: string,
+          action?: { text: string; onClick: () => void }
+        ) => {
+          appendMsgRef.current({
+            type: "system",
+            content: { text, action },
+            createdAt: Date.now(),
+          } as unknown as MessageProps);
+        };
+
+        // 加入一个按钮用于自定义处理
+        pushSystemMessage("客服已关闭会话", {
+          text: "新会话",
+          onClick: () => {
+            // 重新加载当前页面，发起新会话
+            window.location.reload();
+          },
+        });
+        setGroupIsClose(true);
       }
     },
   });
   useEffect(() => {
-  console.log('isConnected:', isConnected);
-}, [isConnected]);
+    console.log("isConnected:", isConnected);
+  }, [isConnected]);
 
   const sendMessageRef = useRef(sendMessage);
   const initRef = useRef(false);
@@ -301,8 +308,8 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const [inputDisabled, setInputDisabled] = useState(false);
 
   useEffect(() => {
-    setInputDisabled(!isConnected || sessionClosed);
-  }, [isConnected, sessionClosed]);
+    setInputDisabled(!isConnected || groupIsClose);
+  }, [isConnected, groupIsClose]);
 
   return (
     <>
@@ -315,7 +322,13 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         renderMessageContent={renderMessageContent}
         onSend={handleSend}
         inputOptions={{ disabled: inputDisabled }}
-  toolbar={[{ type: "image", icon: "image", title: sessionClosed ? "会话已关闭" : "图片" }]}
+        toolbar={[
+          {
+            type: "image",
+            icon: "image",
+            title: "图片",
+          },
+        ]}
         onToolbarClick={(item, e) => {
           if (inputDisabled) return;
           if (item.type === "image") {
