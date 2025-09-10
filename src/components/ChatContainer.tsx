@@ -36,6 +36,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const uidRef = useRef(uid);
   const areaRef = useRef(area);
   const userNameRef = useRef(username);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 点击预设问题时，发送消息给服务器
   function answer(questionId: string) {
@@ -47,7 +48,6 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
   // 收到消息时，添加到聊天界面
   const addMessage = useCallback((item: ChatMessage) => {
-    console.log(`收到消息时，添加到聊天界面:`, item);
     // 创建基础消息对象，包含所有消息的公共属性
     const createBaseMessage = () => ({
       position: item.isKefu ? ("left" as const) : ("right" as const),
@@ -87,7 +87,6 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 
       // 处理预设问题部分
       if (item.msgModel.questionList) {
-        console.log(`预设问题:`, item.msgModel.questionList);
         appendMsgRef.current({
           ...createBaseMessage(),
           type: "question",
@@ -140,7 +139,6 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         // 获取历史消息
         API.chat.getHistory(chatIdRef.current, "").then((res) => {
           // 添加历史消息到聊天界面
-          console.log("历史消息:", res);
           res.list.forEach((item: ChatMessage) => {
             addMessage(item);
           });
@@ -160,6 +158,39 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       ""
     );
   }
+
+  // 处理图片发送
+  const handleImageSend = (file?: File): Promise<any> => {
+    console.log("图片发送:", file);
+    return new Promise((resolve) => {
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          appendMsg({
+            type: 'image',
+            content: { src: evt.target?.result as string },
+            position: 'right',
+            user: {
+              avatar: Config.userAvatar,
+              name: username,
+            },
+            createdAt: Date.now(),
+          });
+          resolve(true);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        fileInputRef.current?.click();
+      }
+    });
+  };
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageSend(file);
+    }
+  };
 
   // 自定义消息渲染
   function renderMessageContent(msg: MessageProps) {
@@ -203,17 +234,30 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   }
 
   return (
-    <Chat
-      isX
-      locale={area}
-      navbar={{ title: "智能助理" }}
-      messages={messages}
-      wideBreakpoint="800px"
-      renderMessageContent={renderMessageContent}
-      onSend={handleSend}
-      toolbar={[{ type: "image", icon: "image", title: "图片" }]}
-      onImageSend={() => Promise.resolve()}
-    />
+    <>
+      <Chat
+        isX
+        locale={area}
+        navbar={{ title: "智能助理" }}
+        messages={messages}
+        wideBreakpoint="800px"
+        renderMessageContent={renderMessageContent}
+        onSend={handleSend}
+        toolbar={[{ type: "image", icon: "image", title: "图片" }]}
+        onToolbarClick={(item, e) => {
+          if (item.type === "image") {
+            handleImageSend();
+          }
+        }}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={onFileChange}
+      />
+    </>
   );
 };
 
