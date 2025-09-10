@@ -32,7 +32,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   const { messages, appendMsg, prependMsgs } = useMessages([]);
   const appendMsgRef = useRef(appendMsg);
   const messagesRef = useRef(messages);
-  const chatIdRef = useRef("");
+  const [chatId, setChatId] = useState("");
   const [groupIsClose, setGroupIsClose] = useState(false); 
   // 用于触发重新渲染
   const uidRef = useRef(uid);
@@ -45,7 +45,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     if (groupIsClose) {
       return;
     }
-    sendMessage("QuestionAsync", questionId, chatIdRef.current);
+    sendMessage("QuestionAsync", questionId, chatId);
   }
 
   // 公共消息对象构造函数
@@ -135,7 +135,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     onMessage: addMessage,
     onCloseGroup: ({ groupId, userName }) => {
       // 仅处理当前会话
-      if (groupId && groupId === chatIdRef.current) {
+      if (groupId && groupId === chatId) {
         // 封装插入系统消息并支持按钮回调
         const pushSystemMessage = (
           text: string,
@@ -170,60 +170,64 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   // 断线重连后自动JoinGroup
   useEffect(() => {
     setOnReconnected(() => {
-      if (chatIdRef.current) {
+      if (chatId) {
         sendMessageRef.current(
           "JoinGroup",
-          chatIdRef.current,
+          chatId,
           areaRef.current || ""
         );
-        console.log("重连后自动加入群组:", chatIdRef.current);
+        console.log("重连后自动加入群组:", chatId);
       }
     });
-  }, [setOnReconnected]);
+  }, [setOnReconnected, chatId]);
 
-  // 在组件首次加载时运行初始化函数
+  // 加入聊天室
   useEffect(() => {
-    if (isConnected && chatIdRef.current) {
+    if (isConnected && chatId) {
       // 加入聊天室
-      console.log("加入聊天室:", chatIdRef.current);
+      console.log("加入聊天室:", chatId);
       sendMessageRef.current(
         "JoinGroup",
-        chatIdRef.current,
+        chatId,
         areaRef.current || ""
       );
     } else {
       console.log("连接断开，等待重连中...");
     }
+  }, [isConnected ,chatId]);
 
+
+  // 在组件首次加载时运行初始化函数
+  useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
     // 获取当前用户对应的聊天组ID
     API.chat.getChatid(uidRef.current).then((res) => {
-      chatIdRef.current = res;
-
+      setChatId(res);
+      console.log("获取到的chatId:", res);
       // 按需创建新的聊天组
       API.chat
         .createGroup(
-          chatIdRef.current,
+          res,
           userNameRef.current,
           uidRef.current,
           areaRef.current
         )
         .then(() => {
           // 获取历史消息
-          API.chat.getHistory(chatIdRef.current, "").then((res) => {
+          API.chat.getHistory(res, "").then((res) => {
             // 添加历史消息到聊天界面
             addMessages(res.list);
           });
         });
     });
-  }, [isConnected, chatIdRef, addMessage, addMessages]);
+  }, [isConnected, addMessage, addMessages]);
 
   // 发送消息
   function handleSend(type: string, val: string) {
     sendMessage(
       "SendMessageToGroup",
-      chatIdRef.current,
+      chatId,
       val,
       uid,
       username,
@@ -239,7 +243,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         // 可在此处通过 sendMessage 发送图片消息到服务端
         sendMessage(
           "SendMessageToGroup",
-          chatIdRef.current,
+          chatId,
           "",
           uid,
           username,
