@@ -28,7 +28,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   username,
   area,
 }) => {
-  const { messages, appendMsg } = useMessages([]);
+  const { messages, appendMsg, prependMsgs } = useMessages([]);
   const appendMsgRef = useRef(appendMsg);
   const messagesRef = useRef(messages);
   const chatIdRef = useRef("");
@@ -46,10 +46,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     sendMessage("QuestionAsync", questionId, chatIdRef.current);
   }
 
-  // 收到消息时，添加到聊天界面
-  const addMessage = useCallback((item: ChatMessage) => {
-    // 创建基础消息对象，包含所有消息的公共属性
-    const createBaseMessage = () => ({
+  // 公共消息对象构造函数
+  function createBaseMessage(item: ChatMessage, idx?: number): MessageProps {
+    return {
+      _id: `${item.id || item.creationTime}${typeof idx === 'number' ? '-' + idx : ''}`,
       position: item.isKefu ? ("left" as const) : ("right" as const),
       user: {
         avatar: item.isKefu ? Config.kefuAvatar : Config.userAvatar,
@@ -57,17 +57,54 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       },
       createdAt: Date.parse(item.creationTime),
       hasTime:
-      messagesRef.current.length > 1 &&
+        messagesRef.current.length > 1 &&
         shouldShowTime(
           messagesRef.current[messagesRef.current.length - 1].createdAt || 0,
           Date.parse(item.creationTime)
         ),
-    });
+      type: "text",
+      content: { text: item.msg || "" },
+    };
+  }
 
+  // 初始化消息列表，批量转换并插入
+  const addMessages = useCallback((items: ChatMessage[]) => {
+    const newMessages: MessageProps[] = items.flatMap((item, idx) => {
+      const base = createBaseMessage(item, idx);
+      if (item.msg) {
+        return {
+          ...base,
+          type: "html",
+          content: { html: item.showMsg === "" ? item.msg : item.showMsg },
+        };
+      }
+      if (item.msgModel?.imageModels) {
+        // 多图片消息拆分为多条
+        return item.msgModel.imageModels.map((imgItem, imgIdx) => ({
+          ...createBaseMessage(item, imgIdx),
+          _id: `${item.creationTime}-img-${imgIdx}`,
+          type: "image",
+          content: { src: imgItem.url },
+        }));
+      }
+      if (item.msgModel?.questionList) {
+        return {
+          ...base,
+          type: "question",
+          content: { list: item.msgModel.questionList },
+        };
+      }
+      return base;
+    });
+    prependMsgs(newMessages);
+  }, []);
+
+  // 收到消息时，添加到聊天界面
+  const addMessage = useCallback((item: ChatMessage) => {
     // 处理文本部分
     if (item.msg) {
       appendMsgRef.current({
-        ...createBaseMessage(),
+        ...createBaseMessage(item),
         type: "html",
         content: { html: item.showMsg === "" ? item.msg : item.showMsg },
       });
@@ -76,9 +113,10 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     if (item.msgModel) {
       // 处理图片部分
       if (item.msgModel.imageModels) {
-        item.msgModel.imageModels.forEach((imgItem) => {
+        item.msgModel.imageModels.forEach((imgItem, imgIdx) => {
           appendMsgRef.current({
-            ...createBaseMessage(),
+            ...createBaseMessage(item, imgIdx),
+            _id: `${item.creationTime}-img-${imgIdx}`,
             type: "image",
             content: { src: imgItem.url },
           });
@@ -88,7 +126,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       // 处理预设问题部分
       if (item.msgModel.questionList) {
         appendMsgRef.current({
-          ...createBaseMessage(),
+          ...createBaseMessage(item),
           type: "question",
           content: { list: item.msgModel.questionList },
         });
@@ -112,7 +150,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
   useEffect(() => {
     setOnReconnected(() => {
       if (chatIdRef.current) {
-        sendMessageRef.current("JoinGroup", chatIdRef.current, areaRef.current || "");
+        sendMessageRef.current(
+          "JoinGroup",
+          chatIdRef.current,
+          areaRef.current || ""
+        );
         console.log("重连后自动加入群组:", chatIdRef.current);
       }
     });
@@ -123,7 +165,11 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     if (isConnected && chatIdRef.current) {
       // 加入聊天室
       console.log("加入聊天室:", chatIdRef.current);
-      sendMessageRef.current("JoinGroup", chatIdRef.current, areaRef.current || "");
+      sendMessageRef.current(
+        "JoinGroup",
+        chatIdRef.current,
+        areaRef.current || ""
+      );
     } else {
       console.log("连接断开，等待重连中...");
     }
@@ -135,15 +181,23 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
       chatIdRef.current = res;
 
       // 按需创建新的聊天组
-      API.chat.createGroup(chatIdRef.current, userNameRef.current, uidRef.current, areaRef.current).then(() => {
-        // 获取历史消息
-        API.chat.getHistory(chatIdRef.current, "").then((res) => {
-          // 添加历史消息到聊天界面
-          res.list.forEach((item: ChatMessage) => {
-            addMessage(item);
+      API.chat
+        .createGroup(
+          chatIdRef.current,
+          userNameRef.current,
+          uidRef.current,
+          areaRef.current
+        )
+        .then(() => {
+          // 获取历史消息
+          API.chat.getHistory(chatIdRef.current, "").then((res) => {
+            // 添加历史消息到聊天界面
+            addMessages(res.list);
+            // res.list.forEach((item: ChatMessage) => {
+            //   addMessage(item);
+            // });
           });
         });
-      });
     });
   }, [isConnected, chatIdRef, addMessage]);
 
@@ -176,10 +230,17 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
         //   createdAt: Date.now(),
         // });
         // 可在此处通过 sendMessage 发送图片消息到服务端
-        sendMessage("SendMessageToGroup", chatIdRef.current, "", uid, username, result.url);
+        sendMessage(
+          "SendMessageToGroup",
+          chatIdRef.current,
+          "",
+          uid,
+          username,
+          result.url
+        );
         return true;
       } catch (err) {
-        console.error('图片上传失败', err);
+        console.error("图片上传失败", err);
         return false;
       }
     } else {
