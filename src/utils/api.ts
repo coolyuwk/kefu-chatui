@@ -41,6 +41,10 @@ export const API = {
   chat: {
     // 获取对话历史
     getHistory: async (chatId: string, startTime: string): Promise<ChatHistoryResponse> => {
+      if (!chatId) {
+        console.warn("getHistory: missing chatId");
+        throw new Error("getHistory: chatId is required");
+      }
       const response = await apiClient.get(
         `/kefu/getMsgList?groupId=${chatId}&startTime=${startTime}`
       );
@@ -49,6 +53,10 @@ export const API = {
 
     // 获取当前群组ID
     getChatid: (uid: string) => {
+      if (!uid) {
+        console.warn("getChatid: missing uid");
+        return Promise.reject(new Error("getChatid: uid is required"));
+      }
       return apiClient.get(`/kefu/getChatId/${uid}`);
     },
 
@@ -59,6 +67,14 @@ export const API = {
       uid: string,
       area: string | null
     ) => {
+      if (!chatId) {
+        console.warn("createGroup: missing chatId");
+        return Promise.reject(new Error("createGroup: chatId is required"));
+      }
+      if (!uid) {
+        console.warn("createGroup: missing uid");
+        return Promise.reject(new Error("createGroup: uid is required"));
+      }
       return apiClient.post(`/kefu/createGroup`, {
         groupId: chatId,
         userId: uid,
