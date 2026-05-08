@@ -86,4 +86,4 @@ jobs:
             echo "${{ secrets.TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ${{ steps.meta.outputs.tags }}-${{ github.sha }}
             docker rm -f kefu_web_main
-            docker run -d -p 9035:80 --name=kefu_web_main --restart=always ${{ steps.meta.outputs.tags }}-${{ github.sha }}
+            docker run -d -p 9032:80 --name=kefu_web_main --restart=always ${{ steps.meta.outputs.tags }}-${{ github.sha }}
